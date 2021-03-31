@@ -1,0 +1,149 @@
+- hosts: localhost
+  become: yes
+  vars_files:
+    - vars/main.yml
+  roles:
+    - geerlingguy.docker
+    - geerlingguy.php
+    - geerlingguy.composer
+    - geerlingguy.nodejs
+
+  tasks:
+  ## System's tasks ##
+  # update cache
+  - name: update apt cache
+    apt:
+      update_cache: yes
+
+  # update distro
+  - name: upgrade packages
+    apt:
+      upgrade: dist
+
+  - name: check if reboot is required
+    register: reboot_required_file
+    stat:
+      path: /var/run/reboot-required get_md5=no
+
+  - name: restart machine
+    reboot:
+      msg: "Reboot initiated by Ansible"
+    when: reboot_required_file.stat.exists == true
+
+  - name: waiting for machine to come back
+    wait_for_connection:
+      delay: 10
+      connect_timeout: 300
+    when: reboot_required_file.stat.exists == true
+
+  ## Install system tools##
+  - name: Install system tools
+    apt:
+      pkg:
+        - kubuntu-restricted-extras
+        - build-essential
+        - debconf-utils
+        - htop
+        - openssh-server
+        - yakuake
+        - curl
+        - git
+        - vagrant
+        - virtualbox
+        - virtualbox-guest-dkms
+        - virtualbox-guest-x11
+        - virtualbox-guest-additions-iso
+      install_recommends: yes
+      state: latest
+      update_cache: true
+
+  # Install virtualbox-ext-pack
+  - name: Install virtualbox-ext-pack
+    command: echo "virtualbox-ext-pack virtualbox-ext-pack/license select true" | debconf-set-selections && apt -yq install virtualbox-ext-pack
+    environment: 
+      DEBIAN_FRONTEND: noninteractive
+
+  ## Install desktop, office and design  tools ##
+  - name: Install desktop, office and design  tools
+    apt:
+      pkg:
+        - kazam
+        - ktouch
+        - gimp
+        - inkscape
+        - blender
+        - krita
+        - scribus
+        - librecad
+      install_recommends: yes
+      state: latest
+      update_cache: true
+
+  ## Install web browsers ##
+
+  # Install Google Chrome
+
+  # Install Microsoft Edge
+
+  # Install Brave
+
+  # Install ruby
+  - name: Install ruby
+    apt:
+      name: ruby
+      state: present
+
+  # Install pygmy
+  - name: Install pygmy
+    command: gem install pygmy
+
+  # Install ahoy
+  - name: Download ahoy
+    get_url:
+      url: https://github.com/ahoy-cli/ahoy/releases/download/2.0.0/ahoy-bin-linux-amd64
+      dest: /usr/local/bin/ahoy
+      mode: '0550'
+
+  # Add ahoy ownership to the user
+  - name: Add ahoy ownership to vagrant user
+    ansible.builtin.file:
+      path: /usr/local/bin/ahoy
+      owner: "{{ user_name }}"
+      group: "{{ user_name }}"
+      mode: '0544'
+
+  # Install lando
+  - name: Download lando
+    get_url:
+      url: https://files.devwithlando.io/lando-stable.deb
+      dest: /tmp/lando-stable.deb
+      mode: '0550'
+
+  # Install lando
+  - name: Install lando
+    command: dpkg -i --ignore-depends=docker-ce /tmp/lando-stable.deb
+
+  # sudo groupadd docker
+  - name: Create "docker" group
+    group:
+      name: "docker"
+      state: present
+
+  # sudo usermod -aG docker root
+  - name: Add "vagrant" user to "docker" group
+    user:
+      name: "{{ user_name }}"
+      group: "docker"
+      append: yes
+
+  # Install vscode a snap with classic confinement
+  - name: Install "vscode" with option --classic
+    snap:
+      name: code
+      classic: yes
+
+  # Install phpstorm a snap with classic confinement
+  - name: Install "phpstorm" with option --classic
+    snap:
+      name: phpstorm
+      classic: yes
